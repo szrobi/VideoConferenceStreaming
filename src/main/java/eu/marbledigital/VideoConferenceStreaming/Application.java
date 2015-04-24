@@ -7,6 +7,7 @@ import org.red5.io.utils.ObjectMap;
 import org.red5.server.adapter.ApplicationAdapter;
 import org.red5.server.api.IClient;
 import org.red5.server.api.IConnection;
+import org.red5.server.api.Red5;
 import org.red5.server.api.scope.IScope;
 import org.red5.server.api.service.IServiceCapableConnection;
 import org.red5.server.api.stream.IServerStream;
@@ -66,20 +67,20 @@ public class Application extends ApplicationAdapter {
 						"Client rejected: no userId or roomId or roomToken given ({})",
 						conn.getRemoteAddress());
 				return false;
-			}			
-					
-		
+			}
+
 			log.info("Connecting to scope: " + scope.getPath() + "/"
 					+ scope.getName());
-			
+
 		} catch (Exception e) {
 			log.info("Client rejected: exception ({})", e);
 			return false;
 		}
 		return super.appConnect(conn, params);
 	}
+
 	/**
-	 * {@inheritDoc}}
+	 * {@inheritDoc}
 	 */
 	@Override
 	public boolean roomConnect(IConnection conn, Object[] params) {
@@ -103,41 +104,46 @@ public class Application extends ApplicationAdapter {
 			Red5Client red5Client = new Red5Client();
 			User user = red5Client.getUser(Integer
 					.parseInt(connectionParameters.get("user_Id").toString()));
-			Integer roomId=Integer.parseInt(scope.getName());
+			Integer roomId = Integer.parseInt(scope.getName());
 			Room room = red5Client.getRoom(roomId);
 
-			List<User> joinedUsers=room.getJoinedUsers();
-			log.info("Current user: "+user.toString()); 
-			log.info("Joined users: "+joinedUsers.toString()); 
-			for(IClient client:scope.getClients()){
-				for(IConnection connection:client.getConnections()){
-					((IServiceCapableConnection)connection).invoke("userConnected",new Object[]{user.getId()});
+			List<User> joinedUsers = room.getJoinedUsers();
+			log.info("Current user: " + user.toString());
+			log.info("Joined users: " + joinedUsers.toString());
+
+			for (IClient client : this.getClients()) {
+
+					for (IConnection connection : client.getConnections()) {
+						((IServiceCapableConnection) connection).invoke(
+								"userConnected", new Object[] { user.getId(),
+										user.getUsername() });
+						log.info("userConnected method invoked");
+					
 				}
 			}
-			
-			
 
 			if (joinedUsers.contains(user)) {
-				log.info("Joined users list contains current user", user.getUsername());
-				
+				log.info("Joined users list contains current user",
+						user.getUsername());
+
 			}
-			
-			else{
+
+			else {
 				log.info("Connection rejected!");
 				this.rejectClient();
 				return false;
 			}
-		}
-		catch (Exception e) {
+		} catch (Exception e) {
 			log.info("Client rejected: ", e);
 			return false;
 		}
 		return super.roomConnect(conn, params);
 	}
 
-/**
- * {@inheritDoc}
- */
+	/**
+	 * {@inheritDoc}
+	 */
+
 	@Override
 	public void appDisconnect(IConnection conn) {
 		log.info("VideoConference app disconnected");

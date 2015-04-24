@@ -93,6 +93,6 @@ public class Room {
 	}
 	@Override
 	public String toString() {
-	return "userId=" + id + ",token=" + token + ", owner={" + owner.toString()+"}";
+	return "roomId=" + id + ",token=" + token + ", owner={" + owner.toString()+"}";
 	}
 }
