@@ -10,7 +10,7 @@ import org.springframework.web.client.RestTemplate;
  * @author Robert Szabados
  *
  */
-public class Red5Client {
+public class ApiClient {
 	
 	/** 
 	 * Gets all users from JSON

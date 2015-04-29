@@ -12,7 +12,7 @@ import org.red5.server.api.scope.IScope;
 import org.red5.server.api.service.IServiceCapableConnection;
 import org.red5.server.api.stream.IServerStream;
 
-import eu.marbledigital.VideoConference.Model.Red5Client;
+import eu.marbledigital.VideoConference.Model.ApiClient;
 import eu.marbledigital.VideoConference.Model.Room;
 import eu.marbledigital.VideoConference.Model.User;
 
@@ -101,11 +101,11 @@ public class Application extends ApplicationAdapter {
 				return false;
 			}
 
-			Red5Client red5Client = new Red5Client();
-			User user = red5Client.getUser(Integer
+			ApiClient apiClient = new ApiClient();
+			User user = apiClient.getUser(Integer
 					.parseInt(connectionParameters.get("user_Id").toString()));
 			Integer roomId = Integer.parseInt(scope.getName());
-			Room room = red5Client.getRoom(roomId);
+			Room room = apiClient.getRoom(roomId);
 
 			List<User> joinedUsers = room.getJoinedUsers();
 			log.info("Current user: " + user.toString());
