@@ -22,6 +22,11 @@
         <property name="virtualHosts" value="*" />
     </bean>
 
-    <bean id="web.handler.VideoConferenceStreaming" class="eu.marbledigital.VideoConferenceStreaming.Application"/>
+    <bean id="VideoConferenceApiClient" class="eu.marbledigital.VideoConcerenceStreaming.Service.RestApiClient">
+        <property name="apiServerBaseUri" value="http://localhost:8080"/>
+    </bean>
 
+    <bean id="web.handler.VideoConferenceStreaming" class="eu.marbledigital.VideoConferenceStreaming.Application">
+        <property name="apiClient" ref="VideoConferenceApiClient" />
+    </bean>
 </beans>

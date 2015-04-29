@@ -2,19 +2,19 @@ package eu.marbledigital.VideoConferenceStreaming;
 
 import java.util.List;
 
-import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.red5.io.utils.ObjectMap;
 import org.red5.server.adapter.ApplicationAdapter;
 import org.red5.server.api.IClient;
 import org.red5.server.api.IConnection;
-import org.red5.server.api.Red5;
 import org.red5.server.api.scope.IScope;
-import org.red5.server.api.service.IServiceCapableConnection;
 import org.red5.server.api.stream.IServerStream;
 
-import eu.marbledigital.VideoConference.Model.ApiClient;
-import eu.marbledigital.VideoConference.Model.Room;
-import eu.marbledigital.VideoConference.Model.User;
+import eu.marbledigital.VideoConcerenceStreaming.Service.IApiClient;
+import eu.marbledigital.VideoConferenceStreaming.Model.Room;
+import eu.marbledigital.VideoConferenceStreaming.Model.User;
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import org.red5.server.api.service.ServiceUtils;
 
 /**
  * Red5 Application for the Video Conference Streaming Service
@@ -23,134 +23,167 @@ import eu.marbledigital.VideoConference.Model.User;
  */
 public class Application extends ApplicationAdapter {
 
-	private IScope appScope;
-	private IServerStream serverStream;
+    private IScope appScope;
+    private IServerStream serverStream;
+    private IApiClient apiClient;
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public boolean appStart(IScope app) {
-		super.appStart(app);
+    private ConcurrentHashMap<IScope, List<User>> usersInRooms = new ConcurrentHashMap<>();
 
-		log.info("Video Conference Streaming is starting up");
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean appStart(IScope app) {
+        super.appStart(app);
 
-		appScope = app;
+        log.info("Video Conference Streaming is starting up");
 
-		return true;
-	}
+        appScope = app;
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public boolean appConnect(IConnection conn, Object[] params) {
+        return true;
+    }
 
-		log.info("Video Conference Streaming appConnect");
-		log.info(conn.toString());
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean appConnect(IConnection conn, Object[] params) {
 
-		IScope scope = conn.getScope();
+        log.info("Video Conference Streaming appConnect");
+        log.info(conn.toString());
 
-		log.info("App connect called for scope: {}", scope.getName());
+        IScope scope = conn.getScope();
 
-		try {
-			if (params.length != 1 || !(params[0] instanceof ObjectMap)) {
-				log.info("Client rejected: invalid connection parameters");
-				return false;
-			}
+        log.info("App connect called for scope: {}", scope.getName());
 
-			ObjectMap<String, Object> connectionParameters = (ObjectMap) params[0];
+        try {
+            if (params.length != 1 || !(params[0] instanceof ObjectMap)) {
+                log.info("Client rejected: invalid connection parameters");
+                return false;
+            }
 
-			if (!connectionParameters.containsKey("user_Id")
-					|| !connectionParameters.containsKey("room_Token")) {
-				log.info(
-						"Client rejected: no userId or roomId or roomToken given ({})",
-						conn.getRemoteAddress());
-				return false;
-			}
+            ObjectMap<String, Object> connectionParameters = (ObjectMap) params[0];
 
-			log.info("Connecting to scope: " + scope.getPath() + "/"
-					+ scope.getName());
+            if (!connectionParameters.containsKey("user_Id")
+                    || !connectionParameters.containsKey("room_Token")) {
+                log.info(
+                        "Client rejected: no userId or roomId or roomToken given ({})",
+                        conn.getRemoteAddress());
+                return false;
+            }
 
-		} catch (Exception e) {
-			log.info("Client rejected: exception ({})", e);
-			return false;
-		}
-		return super.appConnect(conn, params);
-	}
+            log.info("Connecting to scope: " + scope.getPath() + "/"
+                    + scope.getName());
 
-	/**
-	 * {@inheritDoc}
-	 */
-	@Override
-	public boolean roomConnect(IConnection conn, Object[] params) {
+        } catch (Exception e) {
+            log.info("Client rejected: exception ({})", e);
+            return false;
+        }
+        return super.appConnect(conn, params);
+    }
 
-		IScope scope = conn.getScope();
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean roomConnect(IConnection conn, Object[] params) {
+        log.info("Video Conference Streaming roomConnect");
 
-		try {
-			if (params.length != 1 || !(params[0] instanceof ObjectMap)) {
-				log.info("Client rejected: invalid connection parameters");
-				return false;
-			}
+        IScope roomScope = conn.getScope();
 
-			ObjectMap<String, Object> connectionParameters = (ObjectMap) params[0];
+        try {
+            if (params.length != 1 || !(params[0] instanceof ObjectMap)) {
+                log.info("Client rejected: invalid connection parameters");
+                return false;
+            }
 
-			if (!connectionParameters.containsKey("user_Id")) {
-				log.info("Client rejected: no userId or roomId given ({})",
-						conn.getRemoteAddress());
-				return false;
-			}
+            ObjectMap<String, Object> connectionParameters = (ObjectMap) params[0];
 
-			ApiClient apiClient = new ApiClient();
-			User user = apiClient.getUser(Integer
-					.parseInt(connectionParameters.get("user_Id").toString()));
-			Integer roomId = Integer.parseInt(scope.getName());
-			Room room = apiClient.getRoom(roomId);
+            if (!connectionParameters.containsKey("user_Id")) {
+                log.info("Client rejected: no userId or roomId given ({})",
+                        conn.getRemoteAddress());
+                return false;
+            }
 
-			List<User> joinedUsers = room.getJoinedUsers();
-			log.info("Current user: " + user.toString());
-			log.info("Joined users: " + joinedUsers.toString());
+            User user = apiClient.getUser(Integer
+                    .parseInt(connectionParameters.get("user_Id").toString()));
+            Integer roomId = Integer.parseInt(roomScope.getName());
+            Room room = apiClient.getRoom(roomId);
 
-			for (IClient client : this.getClients()) {
+            List<User> joinedUsers = room.getJoinedUsers();
 
-					for (IConnection connection : client.getConnections()) {
-						((IServiceCapableConnection) connection).invoke(
-								"userConnected", new Object[] { user.getId(),
-										user.getUsername() });
-						log.info("userConnected method invoked");
-					
-				}
-			}
+            if (joinedUsers.contains(user)) {
+                log.debug("Joined users list contains current user ({})", user.getUsername());
+            } else {
+                log.info("Connection rejected!");
+                rejectClient("User not in room.");
+                return false;
+            }
 
-			if (joinedUsers.contains(user)) {
-				log.info("Joined users list contains current user",
-						user.getUsername());
+            ServiceUtils.invokeOnAllScopeConnections(roomScope, "userConnected", new Object[]{user.getId(), user.getUsername()}, null);
 
-			}
+            conn.getClient().setAttribute("user", user);
+        } catch (Exception e) {
+            log.info("Client rejected: ", e);
+            return false;
+        }
 
-			else {
-				log.info("Connection rejected!");
-				this.rejectClient();
-				return false;
-			}
-		} catch (Exception e) {
-			log.info("Client rejected: ", e);
-			return false;
-		}
-		return super.roomConnect(conn, params);
-	}
+        return super.roomConnect(conn, params);
+    }
 
-	/**
-	 * {@inheritDoc}
-	 */
+    @Override
+    public boolean roomJoin(IClient client, IScope room) {
+        log.info("Client ({}) joining room {}", client.getId(), room.getName());
+        boolean ret = super.roomJoin(client, room);
 
-	@Override
-	public void appDisconnect(IConnection conn) {
-		log.info("VideoConference app disconnected");
-		if (appScope == conn.getScope() && serverStream != null) {
-			serverStream.close();
-		}
-		super.appDisconnect(conn);
-	}
+        if (ret) {
+
+            if (usersInRooms.get(room) == null) {
+                List<User> existingUsers = usersInRooms.put(room, new ArrayList<>());
+
+                if (existingUsers != null) {
+                    existingUsers.add((User) client.getAttribute("user"));
+                }
+            } else {
+                usersInRooms.get(room).add((User) client.getAttribute("user"));
+            }
+
+            if (client.getConnections().iterator().hasNext()) {
+                ServiceUtils.invokeOnConnection(client.getConnections().iterator().next(), "usersInRoom", new Object[]{usersInRooms.get(room)}, null);
+            } else {
+                log.info("No connections for the client");
+            }
+        }
+
+        return ret;
+    }
+
+    @Override
+    public void roomLeave(IClient client, IScope room) {
+        User user = (User) client.getAttribute("user");
+
+        usersInRooms.get(room).remove(user);
+
+        ServiceUtils.invokeOnAllScopeConnections(room, "userDisconnected", new Object[]{user.getId(), user.getUsername()}, null);
+
+        super.roomLeave(client, room);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void appDisconnect(IConnection conn) {
+        log.info("VideoConference app disconnected");
+
+        if (appScope == conn.getScope() && serverStream != null) {
+            serverStream.close();
+        }
+        super.appDisconnect(conn);
+    }
+
+    public void setApiClient(IApiClient apiClient) {
+        this.apiClient = apiClient;
+    }
 
 }
